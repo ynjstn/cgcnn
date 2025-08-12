@@ -21,10 +21,10 @@ from cgcnn.model import CrystalGraphConvNet
 parser = argparse.ArgumentParser(description='Crystal Graph Convolutional Neural Networks')
 parser.add_argument('data_options', metavar='OPTIONS', nargs='+',
                     help='dataset options, started with the path to root dir, '
-                         'then other options')
+                        'then other options')
 parser.add_argument('--task', choices=['regression', 'classification'],
                     default='regression', help='complete a regression or '
-                                                   'classification task (default: regression)')
+                                                'classification task (default: regression)')
 parser.add_argument('--disable-cuda', action='store_true',
                     help='Disable CUDA')
 parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
@@ -37,10 +37,10 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     metavar='N', help='mini-batch size (default: 256)')
 parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
                     metavar='LR', help='initial learning rate (default: '
-                                       '0.01)')
+                                    '0.01)')
 parser.add_argument('--lr-milestones', default=[100], nargs='+', type=int,
                     metavar='N', help='milestones for scheduler (default: '
-                                      '[100])')
+                                    '[100])')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=0, type=float,
@@ -53,14 +53,14 @@ train_group = parser.add_mutually_exclusive_group()
 train_group.add_argument('--train-ratio', default=None, type=float, metavar='N',
                     help='number of training data to be loaded (default none)')
 train_group.add_argument('--train-size', default=None, type=int, metavar='N',
-                         help='number of training data to be loaded (default none)')
+                        help='number of training data to be loaded (default none)')
 valid_group = parser.add_mutually_exclusive_group()
 valid_group.add_argument('--val-ratio', default=0.1, type=float, metavar='N',
                     help='percentage of validation data to be loaded (default '
-                         '0.1)')
+                        '0.1)')
 valid_group.add_argument('--val-size', default=None, type=int, metavar='N',
-                         help='number of validation data to be loaded (default '
-                              '1000)')
+                        help='number of validation data to be loaded (default '
+                            '1000)')
 test_group = parser.add_mutually_exclusive_group()
 test_group.add_argument('--test-ratio', default=0.1, type=float, metavar='N',
                     help='percentage of test data to be loaded (default 0.1)')
@@ -77,6 +77,9 @@ parser.add_argument('--n-conv', default=3, type=int, metavar='N',
                     help='number of conv layers')
 parser.add_argument('--n-h', default=1, type=int, metavar='N',
                     help='number of hidden layers after pooling')
+parser.add_argument('--gridsearch', action='store_true',
+                    help='hide or not the training print for grid search')
+parser.set_defaults(gridsearch=False)
 
 args = parser.parse_args(sys.argv[1:])
 
@@ -87,9 +90,18 @@ if args.task == 'regression':
 else:
     best_mae_error = 0.
 
-
 def main():
+
     global args, best_mae_error
+
+    def set_all_seeds(seed):
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+    set_all_seeds(42)
 
     # load data
     dataset = CIFData(*args.data_options)
@@ -156,7 +168,7 @@ def main():
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
-            checkpoint = torch.load(args.resume)
+            checkpoint = torch.load(args.resume, weights_only=False)
             args.start_epoch = checkpoint['epoch']
             best_mae_error = checkpoint['best_mae_error']
             model.load_state_dict(checkpoint['state_dict'])
@@ -200,10 +212,12 @@ def main():
         }, is_best)
 
     # test best model
-    print('---------Evaluate Model on Test Set---------------')
-    best_checkpoint = torch.load('model_best.pth.tar')
+    if args.gridsearch == False:
+        print('---------Evaluate Model on Test Set---------------')
+    best_checkpoint = torch.load('model_best.pth.tar', weights_only=False)
     model.load_state_dict(best_checkpoint['state_dict'])
     validate(test_loader, model, criterion, normalizer, test=True)
+
 
 
 def train(train_loader, model, criterion, optimizer, epoch, normalizer):
@@ -275,31 +289,33 @@ def train(train_loader, model, criterion, optimizer, epoch, normalizer):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
-            if args.task == 'regression':
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                    epoch, i, len(train_loader), batch_time=batch_time,
-                    data_time=data_time, loss=losses, mae_errors=mae_errors)
-                )
-            else:
-                print('Epoch: [{0}][{1}/{2}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
-                      'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
-                      'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
-                      'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
-                      'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
-                    epoch, i, len(train_loader), batch_time=batch_time,
-                    data_time=data_time, loss=losses, accu=accuracies,
-                    prec=precisions, recall=recalls, f1=fscores,
-                    auc=auc_scores)
-                )
+        if args.gridsearch == False:
+
+            if i % args.print_freq == 0:
+                if args.task == 'regression':
+                    print('Epoch: [{0}][{1}/{2}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
+                        epoch, i, len(train_loader), batch_time=batch_time,
+                        data_time=data_time, loss=losses, mae_errors=mae_errors)
+                    )
+                else:
+                    print('Epoch: [{0}][{1}/{2}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
+                        'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
+                        'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
+                        'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
+                        'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
+                        epoch, i, len(train_loader), batch_time=batch_time,
+                        data_time=data_time, loss=losses, accu=accuracies,
+                        prec=precisions, recall=recalls, f1=fscores,
+                        auc=auc_scores)
+                    )
 
 
 def validate(val_loader, model, criterion, normalizer, test=False):
@@ -382,26 +398,28 @@ def validate(val_loader, model, criterion, normalizer, test=False):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
-            if args.task == 'regression':
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
-                    i, len(val_loader), batch_time=batch_time, loss=losses,
-                    mae_errors=mae_errors))
-            else:
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
-                      'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
-                      'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
-                      'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
-                      'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
-                    i, len(val_loader), batch_time=batch_time, loss=losses,
-                    accu=accuracies, prec=precisions, recall=recalls,
-                    f1=fscores, auc=auc_scores))
+
+        if args.gridsearch == False:
+            if i % args.print_freq == 0:
+                if args.task == 'regression':
+                    print('Test: [{0}/{1}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'MAE {mae_errors.val:.3f} ({mae_errors.avg:.3f})'.format(
+                        i, len(val_loader), batch_time=batch_time, loss=losses,
+                        mae_errors=mae_errors))
+                else:
+                    print('Test: [{0}/{1}]\t'
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                        'Accu {accu.val:.3f} ({accu.avg:.3f})\t'
+                        'Precision {prec.val:.3f} ({prec.avg:.3f})\t'
+                        'Recall {recall.val:.3f} ({recall.avg:.3f})\t'
+                        'F1 {f1.val:.3f} ({f1.avg:.3f})\t'
+                        'AUC {auc.val:.3f} ({auc.avg:.3f})'.format(
+                        i, len(val_loader), batch_time=batch_time, loss=losses,
+                        accu=accuracies, prec=precisions, recall=recalls,
+                        f1=fscores, auc=auc_scores))
 
     if test:
         star_label = '**'
@@ -414,8 +432,12 @@ def validate(val_loader, model, criterion, normalizer, test=False):
     else:
         star_label = '*'
     if args.task == 'regression':
-        print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
+        if args.gridsearch == False:
+            print(' {star} MAE {mae_errors.avg:.3f}'.format(star=star_label,
                                                         mae_errors=mae_errors))
+        else:
+            if test:
+                print(mae_errors.avg.item(), end='')
         return mae_errors.avg
     else:
         print(' {star} AUC {auc.avg:.3f}'.format(star=star_label,

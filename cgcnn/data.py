@@ -298,7 +298,7 @@ class CIFData(Dataset):
     cif_id: str or int
     """
     def __init__(self, root_dir, max_num_nbr=12, radius=8, dmin=0, step=0.2,
-                 random_seed=123):
+                 random_seed=42):
         self.root_dir = root_dir
         self.max_num_nbr, self.radius = max_num_nbr, radius
         assert os.path.exists(root_dir), 'root_dir does not exist!'
@@ -320,8 +320,14 @@ class CIFData(Dataset):
     @functools.lru_cache(maxsize=None)  # Cache loaded structures
     def __getitem__(self, idx):
         cif_id, target = self.id_prop_data[idx]
+        cache_path = os.path.join(self.root_dir, 'cache_structure', f"{cif_id}.pt")
+
+        if os.path.exists(cache_path):
+            return torch.load(cache_path)
+
         crystal = Structure.from_file(os.path.join(self.root_dir,
                                                    cif_id+'.cif'))
+        #crystal.make_supercell([3,3,3])
         atom_fea = np.vstack([self.ari.get_atom_fea(crystal[i].specie.number)
                               for i in range(len(crystal))])
         atom_fea = torch.Tensor(atom_fea)
@@ -330,9 +336,9 @@ class CIFData(Dataset):
         nbr_fea_idx, nbr_fea = [], []
         for nbr in all_nbrs:
             if len(nbr) < self.max_num_nbr:
-                warnings.warn('{} not find enough neighbors to build graph. '
+                warnings.warn('{cif_id} not find enough neighbors to build graph. '
                               'If it happens frequently, consider increase '
-                              'radius.'.format(cif_id))
+                              'radius.'.format(cif_id=cif_id))
                 nbr_fea_idx.append(list(map(lambda x: x[2], nbr)) +
                                    [0] * (self.max_num_nbr - len(nbr)))
                 nbr_fea.append(list(map(lambda x: x[1], nbr)) +
@@ -349,4 +355,9 @@ class CIFData(Dataset):
         nbr_fea = torch.Tensor(nbr_fea)
         nbr_fea_idx = torch.LongTensor(nbr_fea_idx)
         target = torch.Tensor([float(target)])
+
+        sample = (atom_fea, nbr_fea, nbr_fea_idx), target, cif_id
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        torch.save(sample, cache_path)
+
         return (atom_fea, nbr_fea, nbr_fea_idx), target, cif_id

@@ -1,3 +1,8 @@
+# Adding functionalities
+- Random seed
+- torch cif files cache
+- Plot settings for gridsearch
+
 # Crystal Graph Convolutional Neural Networks
 
 This software package implements the Crystal Graph Convolutional Neural Networks (CGCNN) that takes an arbitary crystal structure to predict material properties. 
