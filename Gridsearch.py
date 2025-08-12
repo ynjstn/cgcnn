@@ -21,19 +21,20 @@ Param list
 '''
 
 
-grid_result =  pd.DataFrame(columns=['MAE','epochs', 'batch-size', 'learning_rate', 'optim_SGD', 'atom_fea_len', 'h_fea_len', 'n_conv', 'n_h'])
-grid_error =  pd.DataFrame(columns=['epochs', 'batch-size', 'learning_rate','optim_SGD', 'atom_fea_len', 'h_fea_len', 'n_conv', 'n_h'])
+grid_result = pd.DataFrame(columns=['MAE', 'epochs', 'batch-size', 'learning_rate', 'optim_SGD', 'atom_fea_len', 'h_fea_len', 'n_conv', 'n_h'])
+grid_error = pd.DataFrame(columns=['epochs', 'batch-size', 'learning_rate', 'optim_SGD', 'atom_fea_len', 'h_fea_len', 'n_conv', 'n_h'])
 
 param_grid = {
-    'epochs' : [2],
-    'batch-size' : [103, 206, 256],
-    'learning-rate' : [0.001, 0.05, 0.01, 0.1],
-    'optim' : ['SGD', 'Adam'],
-    'atom-fea-len' : [16, 31, 64, 128],
-    'h-fea-len' : [32, 64, 128, 256],
-    'n-conv' : [1,3,5,8],
-    'n-h' : [1,3,5,8]
+    'epochs': [2],
+    'batch-size': [103, 206, 256],
+    'learning-rate': [0.001, 0.05, 0.01, 0.1],
+    'optim': ['SGD', 'Adam'],
+    'atom-fea-len': [16, 31, 64, 128],
+    'h-fea-len': [32, 64, 128, 256],
+    'n-conv': [1, 3, 5, 8],
+    'n-h': [1, 3, 5, 8]
 }
+
 
 def main():
 
@@ -53,7 +54,12 @@ def main():
 
 
 def commande_line(param):
-    cmd = ['python', 'main.py', '--train-ratio', '0.6', '--test-ratio', '0.2', '--val-ratio', '0.2', '--gridsearch',
+    cmd = ['python', 'main.py',
+           '--train-ratio', '0.6',
+           '--test-ratio', '0.2',
+           '--val-ratio', '0.2',
+           '--gridsearch',
+           '--epochs', str(param[0]),
             '--epochs', str(param[0]),
             '--batch-size', str(param[1]),
             '--lr', str(param[2]),
@@ -65,12 +71,13 @@ def commande_line(param):
             'data/Cubic_lattice']
     return cmd
 
+
 def run_gridsearch(cmd, param, checkpoint, nbr_errors):
     try:
         result = subprocess.run(cmd, text=True, capture_output=True, check=True)
         print(f'Last MAE : {result.stdout}', param)
         grid_result.loc[len(grid_result)] = [result.stdout, param[0], param[1], param[2], param[3], param[4], param[5], param[6], param[7]]
-        checkpoint +=1
+        checkpoint += 1
         print(checkpoint)
     except subprocess.CalledProcessError as e:
         print('Error, iteration passed. Hyperparameters added to grid_error')
@@ -84,6 +91,7 @@ def run_gridsearch(cmd, param, checkpoint, nbr_errors):
         print(f'Result save to csv file (iteration {checkpoint})')
 
     return checkpoint, nbr_errors
+
 
 if __name__ == '__main__':
     main()
