@@ -2,6 +2,7 @@
 - Random seed
 - torch cif files cache
 - Plot settings for gridsearch
+- Gridsearch script
 
 # Crystal Graph Convolutional Neural Networks
 
